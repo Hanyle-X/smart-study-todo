@@ -125,6 +125,15 @@ function hasDuplicateTaskTitles(tasks: Task[]) {
   return false;
 }
 
+function hasUnlabeledSplitTasks(tasks: Task[]) {
+  const countsByModule = tasks.reduce<Record<string, number>>((counts, task) => {
+    counts[task.moduleId] = (counts[task.moduleId] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  return tasks.some((task) => countsByModule[task.moduleId] > 1 && !/（第 \d+ 段）$/.test(task.title));
+}
+
 function ensureTodayData(data: StudyData, date: string): StudyData {
   if (data.goals.length === 0) return data;
 
@@ -143,7 +152,7 @@ function ensureTodayData(data: StudyData, date: string): StudyData {
   const activeGoal = data.goals[0];
   const todayGoalTasks = data.tasks.filter((task) => task.date === date && task.goalId === activeGoal.id);
   const hasTodayTasks = todayGoalTasks.length > 0;
-  const shouldRefreshPlan = !hasTodayTasks || hasDuplicateTaskTitles(todayGoalTasks);
+  const shouldRefreshPlan = !hasTodayTasks || hasDuplicateTaskTitles(todayGoalTasks) || hasUnlabeledSplitTasks(todayGoalTasks);
   if (existingStatus && !shouldRefreshPlan) return data;
 
   const modules = data.modules.filter((module) => module.goalId === activeGoal.id);
