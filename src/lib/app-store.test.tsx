@@ -35,6 +35,21 @@ describe("buildInitialData", () => {
     expect(data.tasks.some((task) => task.date === "2026-06-24")).toBe(true);
   });
 
+  it("refreshes saved today tasks when split chunks have duplicate titles", () => {
+    const oldData = buildInitialData("2026-06-24");
+    const duplicatedTasks = oldData.tasks.map((task) => ({
+      ...task,
+      title: task.title.replace(/（第 \d+ 段）$/, "")
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...oldData, tasks: duplicatedTasks }));
+
+    const data = buildInitialData("2026-06-24");
+    const readingTasks = data.tasks.filter((task) => task.moduleId === "module-seed-1");
+
+    expect(readingTasks.length).toBeGreaterThan(1);
+    expect(new Set(readingTasks.map((task) => task.title)).size).toBe(readingTasks.length);
+  });
+
   it("keeps the first render stable across server and browser dates", () => {
     vi.setSystemTime(new Date("2026-06-23T08:00:00+08:00"));
     const serverHtml = renderToString(

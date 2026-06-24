@@ -115,6 +115,16 @@ function buildSeedData(date = todayKey()): StudyData {
   };
 }
 
+function hasDuplicateTaskTitles(tasks: Task[]) {
+  const seen = new Set<string>();
+  for (const task of tasks) {
+    const key = `${task.moduleId}:${task.title}`;
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
+
 function ensureTodayData(data: StudyData, date: string): StudyData {
   if (data.goals.length === 0) return data;
 
@@ -131,11 +141,15 @@ function ensureTodayData(data: StudyData, date: string): StudyData {
       notes: "今天根据你的状态重新安排计划。"
     };
   const activeGoal = data.goals[0];
-  const hasTodayTasks = data.tasks.some((task) => task.date === date && task.goalId === activeGoal.id);
-  if (existingStatus && hasTodayTasks) return data;
+  const todayGoalTasks = data.tasks.filter((task) => task.date === date && task.goalId === activeGoal.id);
+  const hasTodayTasks = todayGoalTasks.length > 0;
+  const shouldRefreshPlan = !hasTodayTasks || hasDuplicateTaskTitles(todayGoalTasks);
+  if (existingStatus && !shouldRefreshPlan) return data;
 
   const modules = data.modules.filter((module) => module.goalId === activeGoal.id);
-  const tasks = hasTodayTasks ? data.tasks : [...data.tasks.filter((task) => task.date !== date || task.goalId !== activeGoal.id), ...generateDailyPlan(activeGoal, modules, status, data.reviews)];
+  const tasks = shouldRefreshPlan
+    ? [...data.tasks.filter((task) => task.date !== date || task.goalId !== activeGoal.id), ...generateDailyPlan(activeGoal, modules, status, data.reviews)]
+    : data.tasks;
 
   return {
     ...data,
