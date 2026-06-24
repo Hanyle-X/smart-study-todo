@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { generateDailyPlan } from "./planner";
 import { defaultStudyData, loadStudyData, saveStudyData } from "./storage";
 import type { DailyReview, DailyStatus, Goal, Module, Settings, StudyData, Task } from "./types";
@@ -24,7 +24,7 @@ type AppStore = {
 
 const StoreContext = createContext<AppStore | null>(null);
 
-const seedDate = todayKey();
+const initialRenderDate = "2026-06-23";
 
 const seedData: StudyData = {
   goals: [
@@ -71,7 +71,7 @@ const seedData: StudyData = {
   dailyStatuses: [
     {
       id: "status-seed-1",
-      date: seedDate,
+      date: initialRenderDate,
       wakeUpTime: "07:30",
       sleepHours: 7,
       energyLevel: 4,
@@ -104,7 +104,7 @@ const seedData: StudyData = {
   settings: defaultStudyData.settings
 };
 
-function buildSeedData(date = seedDate): StudyData {
+function buildSeedData(date = todayKey()): StudyData {
   const seedStatus = { ...seedData.dailyStatuses[0], date };
   const seedGoal = seedData.goals[0];
 
@@ -115,23 +115,54 @@ function buildSeedData(date = seedDate): StudyData {
   };
 }
 
-export function buildInitialData(date = seedDate) {
+function ensureTodayData(data: StudyData, date: string): StudyData {
+  if (data.goals.length === 0) return data;
+
+  const existingStatus = data.dailyStatuses.find((item) => item.date === date);
+  const status: DailyStatus =
+    existingStatus ?? {
+      id: `status-${date}`,
+      date,
+      wakeUpTime: "07:30",
+      sleepHours: 7,
+      energyLevel: 4,
+      availableHours: data.settings.defaultAvailableHours,
+      stressLevel: 2,
+      notes: "今天根据你的状态重新安排计划。"
+    };
+  const activeGoal = data.goals[0];
+  const hasTodayTasks = data.tasks.some((task) => task.date === date && task.goalId === activeGoal.id);
+  if (existingStatus && hasTodayTasks) return data;
+
+  const modules = data.modules.filter((module) => module.goalId === activeGoal.id);
+  const tasks = hasTodayTasks ? data.tasks : [...data.tasks.filter((task) => task.date !== date || task.goalId !== activeGoal.id), ...generateDailyPlan(activeGoal, modules, status, data.reviews)];
+
+  return {
+    ...data,
+    dailyStatuses: [status, ...data.dailyStatuses.filter((item) => item.date !== date)],
+    tasks
+  };
+}
+
+export function buildInitialData(date = todayKey()) {
   const loaded = loadStudyData();
   if (loaded.goals.length > 0 || loaded.modules.length > 0 || loaded.tasks.length > 0 || loaded.reviews.length > 0) {
-    return loaded;
+    return ensureTodayData(loaded, date);
   }
   return buildSeedData(date);
 }
 
 export function AppStoreProvider({ children }: { children: React.ReactNode }) {
-  const today = todayKey();
-  const [data, setData] = useState<StudyData>(() => buildSeedData(today));
+  const [today, setToday] = useState(initialRenderDate);
+  const [data, setData] = useState<StudyData>(() => buildSeedData(initialRenderDate));
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setData(buildInitialData(today));
+    const currentDate = todayKey();
+    setToday(currentDate);
+    setData(buildInitialData(currentDate));
     setHydrated(true);
-  }, [today]);
+  }, []);
 
   useEffect(() => {
     if (hydrated) saveStudyData(data);

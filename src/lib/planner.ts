@@ -100,13 +100,14 @@ export function generateDailyPlan(
     remaining = Math.max(0, remaining - share);
     const chunkCount = share >= 70 && !recoveryMode ? 2 : 1;
     const chunkMinutes = Math.max(20, Math.round(share / chunkCount / 5) * 5);
+    const title = buildTaskTitle(module, recoveryMode, lowIntensity);
 
     return Array.from({ length: chunkCount }, (_, taskIndex) => ({
       id: `${dailyStatus.date}-${goal.id}-${module.id}-${taskIndex + 1}`,
       goalId: goal.id,
       moduleId: module.id,
       date: dailyStatus.date,
-      title: buildTaskTitle(module, recoveryMode, lowIntensity),
+      title: chunkCount > 1 ? `${title}（第 ${taskIndex + 1} 段）` : title,
       estimatedMinutes: chunkMinutes,
       difficulty: toDifficulty(lowIntensity ? module.difficulty - 1 : module.difficulty),
       status: "todo" as const

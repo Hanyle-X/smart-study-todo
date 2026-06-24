@@ -125,6 +125,17 @@ describe("generateDailyPlan", () => {
     expect(minutesByModule.get("module-medium") ?? 0).toBeGreaterThanOrEqual(minutesByModule.get("module-low") ?? 0);
   });
 
+  it("labels split task chunks so repeated module work does not look duplicated", () => {
+    const plan = generateDailyPlan(goal, modules, status, [
+      review("2026-06-21", 0.9),
+      review("2026-06-22", 0.85)
+    ]);
+    const readingTasks = plan.filter((task) => task.moduleId === "module-high");
+
+    expect(readingTasks.length).toBeGreaterThan(1);
+    expect(new Set(readingTasks.map((task) => task.title)).size).toBe(readingTasks.length);
+  });
+
   it("lowers intensity when energy is low and stress is high", () => {
     const tiredStatus: DailyStatus = {
       ...status,
